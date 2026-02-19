@@ -153,11 +153,22 @@ st.markdown("""
         background: rgba(255, 255, 255, 0.2);
     }
     
-    /* Hide Default Header */
-    header { visibility: hidden; }
+    /* Hide Default Menu but keep sidebar toggle accessible */
+    header { background: transparent !important; }
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
+    
+    /* Ensure sidebar toggle remains visible and clean */
+    [data-testid="stHeader"] {
+        background: transparent !important;
+    }
+    
+    /* Style the sidebar toggle button for dark theme visibility */
+    [data-testid="stHeader"] button {
+        color: white !important;
+    }
 </style>
+
 """, unsafe_allow_html=True)
 
 # --- SIDEBAR ---
