@@ -215,10 +215,15 @@ for message in st.session_state.messages:
 
 # --- INPUT & RESPONSE ---
 if prompt := st.chat_input("Command your assistant..."):
+    # Length check for stability
+    if len(prompt) > 15000:
+        st.warning("⚠️ Oversized Command: This prompt is exceptionally large and may cause the neural link to fail. Consider breaking it into smaller commands.")
+    
     # Display user input
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
+
 
     # Bot response
     with st.chat_message("assistant"):
@@ -237,27 +242,40 @@ if prompt := st.chat_input("Command your assistant..."):
             response = requests.post(
                 n8n_url,
                 json={"message": prompt},
-                timeout=45
+                timeout=60 # Increased timeout for larger prompts
             )
             
             if response.status_code == 200:
-                data = response.json()
-                # Determine response content
-                if isinstance(data, list) and len(data) > 0 and "output" in data[0]:
-                    ans = data[0]["output"]
-                elif isinstance(data, dict) and "output" in data:
-                    ans = data["output"]
+                if not response.text:
+                    ans = "No response received from the neural node. The prompt might be too large or the workflow didn't return data."
                 else:
-                    ans = "Signal acquired, but data format is irregular."
+                    try:
+                        data = response.json()
+                        # Determine response content
+                        if isinstance(data, list) and len(data) > 0 and "output" in data[0]:
+                            ans = data[0]["output"]
+                        elif isinstance(data, dict) and "output" in data:
+                            ans = data["output"]
+                        else:
+                            ans = f"Signal acquired, but data format is irregular. Response: {response.text[:200]}"
+                    except ValueError:
+                        ans = f"The neural node returned a non-JSON response: {response.text[:500]}"
                 
                 # Update UI
                 msg_area.markdown(ans)
                 st.session_state.messages.append({"role": "assistant", "content": ans})
+            elif response.status_code == 413:
+                msg_area.error("⚠️ Payload Too Large: The prompt you provided is too big for the neural connection.")
+            elif response.status_code == 504:
+                msg_area.error("⚠️ Gateway Timeout: The neural node took too long to process this large request.")
             else:
-                msg_area.error(f"⚠️ Node Connection Error: Code {response.status_code}")
+                msg_area.error(f"⚠️ Node Connection Error: Code {response.status_code}. Details: {response.text[:200]}")
         
+        except requests.exceptions.Timeout:
+            msg_area.error("🕒 Neural Request Timed Out: The process took too long. Try a shorter prompt.")
         except Exception as e:
             msg_area.error(f"🚫 Neural Link Failed: {str(e)}")
+
 
 # Bottom Spacer
 st.markdown("<div style='height: 100px;'></div>", unsafe_allow_html=True)
